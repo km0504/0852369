@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VEB05配列入力</title>
+    <style>
+        /* 画面全体のスクロールを禁止し、画面内にフィットさせる */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: sans-serif;
+            background-color: #f4f4f9;
+            box-sizing: border-box;
+            /* タップ時のテキスト選択・ハイライトを防止 */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* タイトルと枚数表示を絶対に改行させず横並びにする */
+        .header-container {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            flex-wrap: nowrap; /* 改行を防止 */
+            white-space: nowrap; /* テキストの改行を防止 */
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        #status {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #333;
+            line-height: 1;
+        }
+
+        /* メインコンテナ: 全体画面に収まるよう flex で計算 */
+        #mainContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 1000px;
+            width: 100%;
+            margin: 0 auto;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* 上側: 6列の画像グリッド */
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            row-gap: 3px; /* 縦の隙間を半分(3px) */
+            column-gap: 6px; /* 横の隙間は6px */
+            align-items: center;
+            overflow-y: auto;
+            max-height: 60vh;
+            background: #fff;
+            padding: 8px;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            /* ダブルタップズームを無効化 */
+            touch-action: manipulation;
+        }
+
+        .img-btn {
+            width: 100%;
+            height: auto;
+            display: block;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: border-color 0.1s;
+            box-sizing: border-box;
+            /* 連打時の画像選択やドラッグを禁止 */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-user-drag: none;
+            touch-action: manipulation;
+        }
+
+        .img-btn:active {
+            border-color: #007bff;
+        }
+
+        /* 下側: 選択履歴パネル */
+        #sidePanel {
+            background: white;
+            padding: 6px 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* 履歴ヘッダー部分 */
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .history-header-left {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        /* 文字サイズ調整 */
+        .history-header h3 {
+            margin: 0;
+            font-size: 0.8rem;
+        }
+
+        /* 復旧機能の注記テキストサイズ */
+        .restore-note {
+            font-size: 0.65rem;
+            color: #666;
+            font-weight: normal;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        /* 小さめのボタン共通スタイル */
+        .header-btn {
+            border: none;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.1s;
+            color: white;
+            touch-action: manipulation;
+        }
+
+        .reset-btn {
+            background-color: #dc3545;
+        }
+
+        .reset-btn:hover {
+            background-color: #c82333;
+        }
+
+        .restore-btn {
+            background-color: #17a2b8;
+        }
+
+        .restore-btn:hover {
+            background-color: #138496;
+        }
+
+        /* 履歴リスト: 4行分の高さに固定 (32px × 4行 = 128px) */
+        #historyList {
+            height: 128px;
+            max-height: 128px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 2px;
+            margin-bottom: 4px;
+            background: #fafafa;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+        }
+
+        .history-item {
+            height: 32px;
+            padding: 0 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+
+        .history-item:hover, .history-item:active {
+            background-color: #e9f5ff;
+        }
+
+        .history-item.editing {
+            background-color: #fff3cd;
+            font-weight: bold;
+            border-left: 4px solid #ffc107;
+        }
+
+        .history-item .step-num {
+            color: #666;
+            font-weight: bold;
+            width: 70px;
+        }
+
+        .history-item .file-name {
+            flex: 1;
+            word-break: break-all;
+        }
+
+        /* コピーボタンの高さを小さく調整 */
+        .copy-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            touch-action: manipulation;
+            line-height: 1.2;
+        }
+
+        .copy-btn:hover {
+            background-color: #218838;
+        }
+
+        .copy-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        #copyMessage {
+            font-size: 0.75rem;
+            color: green;
+            text-align: center;
+            margin-top: 2px;
+            height: 14px;
+        }
+
+        /* Android対策モーダルスタイル */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #fff;
+            padding: 16px;
+            border-radius: 8px;
+            width: 85%;
+            max-width: 320px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h4 {
+            margin: 0 0 8px 0;
+            font-size: 0.95rem;
+        }
+
+        .modal-content p {
+            margin: 0 0 12px 0;
+            font-size: 0.8rem;
+            color: #555;
+        }
+
+        .paste-box {
+            width: 100%;
+            height: 60px;
+            border: 2px dashed #007bff;
+            border-radius: 6px;
+            background: #e9f5ff;
+            font-size: 0.85rem;
+            box-sizing: border-box;
+            padding: 8px;
+            margin-bottom: 12px;
+            resize: none;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        .cancel-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h1>VEB05配列入力</h1>
+        <div id="status"></div>
+    </div>
+
+    <div id="mainContainer">
+        <!-- 上側: 画像配置エリア -->
+        <div id="grid"></div>
+
+        <!-- 下側: 選択履歴エリア -->
+        <div id="sidePanel">
+            <div class="history-header">
+                <div class="history-header-left">
+                    <h3>選択履歴 (タップして修正)</h3>
+                    <span class="restore-note">※コピーデータを復旧ボタンから復元</span>
+                </div>
+                <div class="btn-group">
+                    <button class="header-btn restore-btn" id="restoreBtn">復旧</button>
+                    <button class="header-btn reset-btn" id="resetBtn">リセット</button>
+                </div>
+            </div>
+            <div id="historyList"></div>
+            <button class="copy-btn" id="copyBtn" disabled>選択結果をクリップボードにコピー</button>
+            <div id="copyMessage"></div>
+        </div>
+    </div>
+
+    <!-- Android対策: 復旧モーダル -->
+    <div class="modal-overlay" id="restoreModal">
+        <div class="modal-content">
+            <h4>データを復旧</h4>
+            <p>枠内をタップして「貼り付け」を押してください</p>
+            <textarea class="paste-box" id="pasteBox" placeholder="ここをタップ／長押しして貼り付け"></textarea>
+            <button class="cancel-btn" id="closeModalBtn">キャンセル</button>
+        </div>
+    </div>
+
+    <script>
+        // ダブルタップズーム防止のJavaScript側制御
+        document.addEventListener('touchstart', function(event) {
+            if (event.touches.length > 1) {
+                event.preventDefault(); // 2本指以上のピンチイン・アウト防止
+            }
+        }, { passive: false });
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault(); // 300ms以内の連打（ダブルタップ）によるズーム防止
+            }
+            lastTouchEnd = now;
+        }, false);
+
+        // Google Drive の画像データ一覧 (VEB05)
+        const imageData = [
+            { id: "VEB05-001", url: "https://lh3.googleusercontent.com/d/14U5g3KftzZqL_wyE0yMsYSV4xSfo1oM6" },
+            { id: "VEB05-002", url: "https://lh3.googleusercontent.com/d/1OItPFIbim7Y93psdxuSTHthV4L-ytoux" },
+            { id: "VEB05-003_p", url: "https://lh3.googleusercontent.com/d/1FYU3F5is2NoSJnmCj6r3fpv2VEgvMo90" },
+            { id: "VEB05-003_v", url: "https://lh3.googleusercontent.com/d/1Wbn-mLtckLbopO6yZ3fMCMx1GlwmRfz8" },
+            { id: "VEB05-003", url: "https://lh3.googleusercontent.com/d/1UenCMJf9uQikJF8cg84deMKv0m6RwLgE" },
+            { id: "VEB05-004", url: "https://lh3.googleusercontent.com/d/1ytRDKW3YBAHRhFf0FLvwHi6UbfWOreVa" },
+            { id: "VEB05-005", url: "https://lh3.googleusercontent.com/d/1BdFlV_Jd6cfbUZz5DFjfMZ0xSVzwbM9e" },
+            { id: "VEB05-006_sec", url: "https://lh3.googleusercontent.com/d/1ieeSxoDaG49EU_wVMNzDe834HMt1_dLi" },
+            { id: "VEB05-006_v", url: "https://lh3.googleusercontent.com/d/1y24qSV0M8302fcbSUwH_kP6byzBPDrGv" },
+            { id: "VEB05-006", url: "https://lh3.googleusercontent.com/d/1r39RBpQC96iqMqJxS9vlK-A-EXotAdOn" },
+            { id: "VEB05-007", url: "https://lh3.googleusercontent.com/d/1J6KhCBohgmYM8nLL4eop-g3mQ8__BdLd" },
+            { id: "VEB05-008_v", url: "https://lh3.googleusercontent.com/d/1XAfHAlTEwC3aLxR7-6BXQ9PmNpJuHFLP" },
+            { id: "VEB05-008", url: "https://lh3.googleusercontent.com/d/1N6NsMpmu6COCuLiF-wTRi8Y_WHg-CNbk" },
+            { id: "VEB05-009", url: "https://lh3.googleusercontent.com/d/109cT3voIAOU7ko2L4Tvcz-AD6vkoZfxi" },
+            { id: "VEB05-010_v", url: "https://lh3.googleusercontent.com/d/1VLvAsnT7hxvEF208L2elV2unISRGLi2D" },
+            { id: "VEB05-010", url: "https://lh3.googleusercontent.com/d/1XqvKM0CfMwfgi21VmmERUBpzg7b07KGn" },
+            { id: "VEB05-011", url: "https://lh3.googleusercontent.com/d/1p7e34Woy8wiKiWYSiU4vDpOgaew208-i" },
+            { id: "VEB05-012", url: "https://lh3.googleusercontent.com/d/1wF77f2H5wRUGLB1zPx0XSbr_WkX6EHtz" },
+            { id: "VEB05-013", url: "https://lh3.googleusercontent.com/d/1hKGL1DV8s7LPfs_JUiljAhrmCEDbwIIw" },
+            { id: "VEB05-014", url: "https://lh3.googleusercontent.com/d/1Itc3--ztq2ps-hya4bIC1BuFD2FcY2JW" },
+            { id: "VEB05-015", url: "https://lh3.googleusercontent.com/d/1vCTo5PDtHwZFyhv1AaDwmoKVwIGW4qvM" },
+            { id: "VEB05-016", url: "https://lh3.googleusercontent.com/d/1Wbc_fUNEWk9uj8fHEZzv0TYFq7sMt4y1" },
+            { id: "VEB05-017", url: "https://lh3.googleusercontent.com/d/1D7IrZkDYSbDmtqRtb5KTnP09zIcozOdX" },
+            { id: "VEB05-018", url: "https://lh3.googleusercontent.com/d/1gi5SKy2VcskmDNt91bjLRzrhuQ4Burpq" },
+            { id: "VEB05-019", url: "https://lh3.googleusercontent.com/d/1J7XDvb8RhHworwoXl8csU3hgSkBKwL-c" },
+            { id: "VEB05-020", url: "https://lh3.googleusercontent.com/d/1fKbBfnGbJVna00bqLvcDROu2rlXZErWB" },
+            { id: "VEB05-021", url: "https://lh3.googleusercontent.com/d/1mB7BFxHe31epZbv2XwkxnWVOqlIhbVQf" },
+            { id: "VEB05-022", url: "https://lh3.googleusercontent.com/d/1gu18KmIfQwVMCOnFe7_tCkyLs1C3Qxm4" },
+            { id: "VEB05-023_p", url: "https://lh3.googleusercontent.com/d/1tdtpb0NvllUH1i0pSbdq-dCufcrK8S-x" },
+            { id: "VEB05-023", url: "https://lh3.googleusercontent.com/d/1h41t5HvSBlCRgJ-3xrmXOzA2TZdotBcy" },
+            { id: "VEB05-024", url: "https://lh3.googleusercontent.com/d/1tGqOuh6EgDDiHFbU0kjR2ynT1e1CUUnI" },
+            { id: "VEB05-025", url: "https://lh3.googleusercontent.com/d/1H7fqShMnbhmoz-bPassndQuSsk5kpU_o" },
+            { id: "VEB05-026", url: "https://lh3.googleusercontent.com/d/1DUranK2Au8zf6OStW7L2-CSyvtd6yc3h" },
+            { id: "VEB05-027", url: "https://lh3.googleusercontent.com/d/1HZ9nAFtm2IqCraxKFd7kdRkagx5mY9jd" },
+            { id: "VEB05-028", url: "https://lh3.googleusercontent.com/d/1ozuHEzWUd4z-9qbFVKX7VtQF0KNNndJ6" }
+        ];
+
+        let history = new Array(100).fill(null);
+        let currentStep = 1;
+        let editStep = null;
+        const maxSteps = 100;
+        const historyDOMItems = [];
+
+        const statusDiv = document.getElementById('status');
+        const gridDiv = document.getElementById('grid');
+        const historyList = document.getElementById('historyList');
+        const copyBtn = document.getElementById('copyBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const restoreBtn = document.getElementById('restoreBtn');
+        const copyMessage = document.getElementById('copyMessage');
+
+        const restoreModal = document.getElementById('restoreModal');
+        const pasteBox = document.getElementById('pasteBox');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+
+        function init() {
+            renderFixedGrid();
+            initHistoryDOM();
+            updateHistoryUI();
+            updateStatus();
+        }
+
+        function formatImageId(id) {
+            // 例: VEB05-006_sec -> sec
+            if (id === "VEB05-006_sec") return "sec";
+
+            let formatted = id.slice(7); // "VEB05-" (6文字) を削るため slice(7)
+            formatted = formatted.replace(/_p/g, "P").replace(/_v/g, "V");
+            formatted = formatted.replace(/_/g, "");
+
+            return formatted;
+        }
+
+        function renderFixedGrid() {
+            gridDiv.innerHTML = '';
+            imageData.forEach((item) => {
+                const img = document.createElement('img');
+                img.src = item.url;
+                img.alt = item.id;
+                img.className = 'img-btn';
+
+                const handleSelect = (e) => {
+                    e.preventDefault();
+                    handleImageSelect(item.id);
+                };
+
+                img.addEventListener('pointerdown', handleSelect);
+                gridDiv.appendChild(img);
+            });
+        }
+
+        function initHistoryDOM() {
+            historyList.innerHTML = '';
+            for (let i = 0; i < maxSteps; i++) {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+
+                const stepSpan = document.createElement('span');
+                stepSpan.className = 'step-num';
+                stepSpan.textContent = `${i + 1}枚目:`;
+
+                const fileSpan = document.createElement('span');
+                fileSpan.className = 'file-name';
+
+                item.appendChild(stepSpan);
+                item.appendChild(fileSpan);
+
+                const handleEditClick = (e) => {
+                    e.preventDefault();
+                    editStep = (editStep === i) ? null : i;
+                    updateHistoryUI();
+                    updateStatus();
+                };
+
+                item.addEventListener('pointerdown', handleEditClick);
+
+                historyList.appendChild(item);
+                historyDOMItems.push({ container: item, fileSpan: fileSpan });
+            }
+        }
+
+        function handleImageSelect(rawImageId) {
+            const formattedId = formatImageId(rawImageId);
+
+            if (editStep !== null) {
+                history[editStep] = formattedId;
+                editStep = null;
+            } else if (currentStep <= maxSteps) {
+                history[currentStep - 1] = formattedId;
+                currentStep++;
+            }
+
+            updateHistoryUI();
+            updateStatus();
+        }
+
+        function updateHistoryUI() {
+            for (let i = 0; i < maxSteps; i++) {
+                const dom = historyDOMItems[i];
+                const val = history[i];
+
+                if (editStep === i) {
+                    dom.container.classList.add('editing');
+                } else {
+                    dom.container.classList.remove('editing');
+                }
+
+                if (val) {
+                    dom.fileSpan.textContent = val;
+                    dom.fileSpan.style.color = '#333';
+                } else {
+                    dom.fileSpan.textContent = '（未選択）';
+                    dom.fileSpan.style.color = '#ccc';
+                }
+            }
+
+            if (editStep === null && currentStep <= maxSteps) {
+                const targetIndex = currentStep - 1;
+                const targetScrollTop = (targetIndex - 3) * 32;
+                historyList.scrollTop = Math.max(0, targetScrollTop);
+            }
+
+            const hasAnyInput = history.some(val => val !== null);
+            copyBtn.disabled = !hasAnyInput;
+        }
+
+        function updateStatus() {
+            if (editStep !== null) {
+                statusDiv.innerHTML = `<span style="color:#d9534f;">【修正】 ${editStep + 1} 枚目</span>`;
+            } else if (currentStep <= maxSteps) {
+                statusDiv.textContent = `(${currentStep} / ${maxSteps} 枚目)`;
+            } else {
+                statusDiv.textContent = "(100枚完了)";
+            }
+        }
+
+        resetBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const hasInput = history.some(val => val !== null);
+            if (!hasInput) return;
+
+            if (confirm("選択履歴をすべてクリアしますか？")) {
+                history = new Array(maxSteps).fill(null);
+                currentStep = 1;
+                editStep = null;
+                updateHistoryUI();
+                updateStatus();
+                copyMessage.textContent = "";
+            }
+        });
+
+        function applyRestoreItems(items) {
+            history = new Array(maxSteps).fill(null);
+            for (let i = 0; i < Math.min(items.length, maxSteps); i++) {
+                history[i] = items[i];
+            }
+            currentStep = Math.min(items.length + 1, maxSteps + 1);
+            editStep = null;
+            updateHistoryUI();
+            updateStatus();
+            copyMessage.textContent = "データを復旧しました！";
+            setTimeout(() => { copyMessage.textContent = ""; }, 3000);
+        }
+
+        // 復旧ボタン：自動読み取り試行 ＋ Android対策モーダル併用
+        restoreBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            try {
+                if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+                    const text = await navigator.clipboard.readText();
+                    if (text && text.trim()) {
+                        processTextAndRestore(text);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.log("自動読み取り制限のため、貼り付け用モーダルを表示します。");
+            }
+
+            pasteBox.value = "";
+            restoreModal.style.display = "flex";
+            setTimeout(() => pasteBox.focus(), 100);
+        });
+
+        pasteBox.addEventListener('paste', (e) => {
+            setTimeout(() => {
+                const text = pasteBox.value;
+                restoreModal.style.display = "none";
+                processTextAndRestore(text);
+            }, 50);
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            restoreModal.style.display = "none";
+        });
+
+        function processTextAndRestore(text) {
+            if (!text || !text.trim()) return;
+            const items = text.split(/\r?\n/).map(s => s.trim()).filter(s => s !== "");
+            if (items.length === 0) {
+                alert("有効な履歴データが見つかりませんでした。");
+                return;
+            }
+            if (confirm(`読み込んだ ${items.length} 件のデータで履歴を復旧しますか？`)) {
+                applyRestoreItems(items);
+            }
+        }
+
+        function copyToClipboard(text) {
+            return new Promise((resolve, reject) => {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text)
+                        .then(() => resolve(true))
+                        .catch(() => fallbackCopy(text, resolve, reject));
+                } else {
+                    fallbackCopy(text, resolve, reject);
+                }
+            });
+        }
+
+        function fallbackCopy(text, resolve, reject) {
+            try {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-9999px';
+                textArea.style.top = '0';
+                document.body.appendChild(textArea);
+                
+                textArea.focus();
+                textArea.select();
+                textArea.setSelectionRange(0, 99999);
+
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+
+                if (successful) resolve(true);
+                else reject(new Error("execCommand copy failed"));
+            } catch (err) {
+                reject(err);
+            }
+        }
+
+        copyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const filledHistory = history.filter(val => val !== null);
+            const textToCopy = filledHistory.join('\n');
+            
+            copyToClipboard(textToCopy)
+                .then(() => {
+                    copyMessage.textContent = `${filledHistory.length}個の選択結果をコピーしました！`;
+                    setTimeout(() => { copyMessage.textContent = ""; }, 3000);
+                })
+                .catch(err => {
+                    alert("コピーに失敗しました。");
+                });
+        });
+
+        init();
+    </script>
+</body>
+</html>
